@@ -1,0 +1,47 @@
+# $eltox's Basic OpenVPN UDP Application Filter
+
+# This is a dummed down version of the UDP OpenVPN application filter that I use. If you have any questions regarding the firewall or would like to test out my more advanced version of the fw, DM me on telegram @mrseltox
+
+# Flush iptables
+iptables -t mangle -P PREROUTING ACCEPT
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -t mangle -F
+iptables -t mangle -X
+iptables -F
+iptables -X
+iptables -t raw -F
+iptables -t raw -X
+iptables -t nat -X
+iptables -t nat -F
+
+# Whitelist ssh
+iptables -t mangle -A PREROUTING -s HOMEIP -m bpf --bytecode "19,48 0 0 0,84 0 0 240,21 0 4 96,48 0 0 6,21 0 13 6,40 0 0 42,21 10 11 22,48 0 0 0,84 0 0 240,21 0 8 64,48 0 0 9,21 0 6 6,40 0 0 6,69 4 0 8191,177 0 0 0,72 0 0 2,21 0 1 22,6 0 0 262144,6 0 0 0" -j ACCEPT
+
+# Accept required traffic
+iptables -t mangle -A PREROUTING -i tun+ -j ACCEPT
+iptables -t mangle -A PREROUTING -i lo -j ACCEPT
+
+# Allow icmp ping
+iptables -t mangle -A PREROUTING -p icmp --icmp-type 8 -m hashlimit --hashlimit-upto 2/sec --hashlimit-burst 2 --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-name accept-icmp -j ACCEPT
+
+# Accept matching control hard reset
+iptables -t mangle -A PREROUTING -m bpf --bytecode "17,48 0 0 0,84 0 0 240,21 0 13 64,40 0 0 2,53 0 11 80,37 10 0 100,48 0 0 9,21 0 8 17,40 0 0 6,69 6 0 8191,177 0 0 0,80 0 0 8,21 0 3 56,64 0 0 17,21 0 1 1,6 0 0 262144,6 0 0 0" -m limit --limit 5/sec -m conntrack --ctstate NEW -j ACCEPT
+
+# Accept related and established
+iptables -t mangle -A PREROUTING -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+# Set policy to drop
+iptables -t mangle -P PREROUTING DROP
+
+# Route web traffic
+iptables -t nat -I POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to-source SECONDIP
+iptables -t nat -I POSTROUTING -m bpf --bytecode "31,48 0 0 0,84 0 0 240,21 0 7 96,48 0 0 6,21 0 2 6,40 0 0 42,21 22 13 80,21 0 22 17,40 0 0 42,21 19 20 53,48 0 0 0,84 0 0 240,21 0 17 64,48 0 0 9,21 0 8 6,40 0 0 6,69 13 0 8191,177 0 0 0,72 0 0 2,21 9 0 80,21 8 0 443,21 7 0 8080,21 6 7 53,21 0 6 17,40 0 0 6,69 4 0 8191,177 0 0 0,72 0 0 2,21 0 1 53,6 0 0 262144,6 0 0 0" -j SNAT --to-source SECONDIP
+
+# Kernal settings
+net.netfilter.nf_conntrack_max = 999999999
+net.netfilter.nf_conntrack_buckets = 99999999
+net.netfilter.nf_conntrack_expect_max = 999999999
+
+sysctl -p
