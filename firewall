@@ -1,7 +1,5 @@
 # $eltox's Basic OpenVPN UDP Application Filter
 
-# This is a dummed down version of the UDP OpenVPN application filter that I use. If you have any questions regarding the firewall or would like to test out my more advanced version of the fw, DM me on telegram @mrseltox
-
 # Flush iptables
 iptables -t mangle -P PREROUTING ACCEPT
 iptables -P INPUT ACCEPT
